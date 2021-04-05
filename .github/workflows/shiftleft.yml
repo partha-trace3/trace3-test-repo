@@ -1,0 +1,45 @@
+name: ShiftLeft Scan
+
+# By default, this workflow runs against the default branch, production branch, and PR branches
+# The specific 'branches' listed below may need to change on a per-project basis
+
+on:
+  push:
+    branches:
+      - main
+      - production
+  pull_request:
+    types: [opened, reopened, synchronize]
+
+jobs:
+  shift_left_scan:
+    runs-on: ubuntu-latest
+    container: node:12
+    name: Run ShiftLeft security scan
+    env:
+      NPM_TOKEN: ${{ secrets.DEVOPS_ALL_NPM_TOKEN }}
+      SHIFTLEFT_ORG_ID: ${{ secrets.DEVOPS_ALL_SHIFTLEFT_ORG_ID }}
+      SHIFTLEFT_ACCESS_TOKEN: ${{ secrets.DEVOPS_ALL_SHIFTLEFT_TOKEN }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      # Expose 'CI_REPOSITORY_NAME' and other CI env vars
+      - name: Expose Env Vars
+        uses: FranzDiebold/github-env-vars-action@v2
+      - name: Download ShiftLeft cli
+        run: |
+          curl https://cdn.shiftleft.io/download/sl > ${GITHUB_WORKSPACE}/sl && chmod a+rx ${GITHUB_WORKSPACE}/sl
+      # ShiftLeft requires Java 1.8
+      - name: Setup Java JDK
+        uses: actions/setup-java@v1.4.3
+        with:
+          java-version: 1.8
+      - name: Analyze with Inspect
+        run: ${GITHUB_WORKSPACE}/sl analyze --app ${{ env.CI_REPOSITORY_NAME }} --tag branch=${{ env.CI_ACTION_REF_NAME }} --js --cpg . -- --ignore-minified --exclude "node_modules,jest-cache,__tests__,__mocks__"
+      - name: Check Analysis
+        # This step will evaluate findings on the current branch against the default branch specified in 'shiftleft.yml' at the project root
+        # We do not want this to fire on pushes to the default/production branches listed in the 'if' below
+        # These specific branch names may need to change on a per-project basis
+        if: ${{ github.ref != 'refs/heads/main' && github.ref != 'refs/heads/production' }}
+        run: ${GITHUB_WORKSPACE}/sl check-analysis --app ${{ env.CI_REPOSITORY_NAME }} --branch ${{ env.CI_ACTION_REF_NAME }}
+        continue-on-error: true # @todo remove this flag when appropriate
