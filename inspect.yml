@@ -1,0 +1,38 @@
+inspect:
+  - app:
+      language: JAVA
+      name: HelloShiftLeft
+      modify-findings:
+        - my_modification_rule
+        - downgrade_sqli
+
+finding-modifications:
+  my_modification_rule:
+    filter:
+      category:
+        - Sensitive Data Leak
+      id:
+        - 97
+      type:
+        - vuln
+      severity:
+        - critical
+    tags:
+      - key: cvss_score
+        value: 7
+      - key: severity
+        value: moderate
+      - key: reason
+        value: appsec_approved
+  
+  downgrade_sqli:
+    filter:
+      category:
+        - XSS
+    tags:
+      - key: cvss_score
+        value: 5
+      - key: severity
+        value: info
+      - key: reason
+        value: appsec_approved
